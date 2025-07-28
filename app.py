@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from scipy.stats import linregress
 import matplotlib
 
-# ✅ 한글 폰트 설정 (NanumGothic) - 먼저 시스템에 설치되어 있어야 함
+# ✅ 한글 폰트 설정 (NanumGothic) 사용 - 시스템에 설치되어 있어야 함
 matplotlib.rcParams['font.family'] = 'NanumGothic'
 matplotlib.rcParams['axes.unicode_minus'] = False
 
@@ -26,10 +26,8 @@ def main():
     conf_level = st.selectbox("📈 신뢰수준", options=["95%", "90%"], index=0)
 
     if conf_level == "95%":
-        confidence = 0.95
         z_factor = 2.0
     else:
-        confidence = 0.90
         z_factor = 1.64
 
     try:
@@ -54,16 +52,14 @@ def main():
 
             if slope < 0:
                 adjusted_slope = slope + z_factor * stderr
-            else:
-                adjusted_slope = slope
-
-            if adjusted_slope == 0:
-                shelf_life = np.inf
-            else:
                 shelf_life = (LCL - intercept) / adjusted_slope
                 shelf_life = max(shelf_life, 0)
+                note = ""
+            else:
+                shelf_life = np.inf
+                note = "(통계적 의미 없음)"
 
-            return result, shelf_life
+            return result, shelf_life, note
 
         # ✅ 그래프
         fig, ax = plt.subplots(figsize=(10, 6))
@@ -71,13 +67,14 @@ def main():
         shelf_life_results = {}
 
         for i, (label, data) in enumerate(lots.items()):
-            result, shelf = estimate_shelf_life(months, data, label)
+            result, shelf, note = estimate_shelf_life(months, data, label)
             predicted = result.slope * months + result.intercept
 
             ax.plot(months, data, 'o', color=colors[i], label=f"{label} 측정값")
-            ax.plot(months, predicted, '-', color=colors[i], label=f"{label} 추세선\n(유효기한: {shelf:.1f}개월)")
+            ax.plot(months, predicted, '-', color=colors[i],
+                    label=f"{label} 추세선\n(유효기한: {'∞' if shelf == np.inf else f'{shelf:.1f}'}개월 {note})")
 
-            shelf_life_results[label] = shelf
+            shelf_life_results[label] = (shelf, note)
 
         ax.axhline(LCL, color='red', linestyle='--', linewidth=2, label='하한선')
         ax.axhline(UCL, color='red', linestyle='--', linewidth=2, label='상한선')
@@ -92,10 +89,13 @@ def main():
 
         st.pyplot(fig)
 
-        # ✅ 결과 표시
+        # ✅ 유효기한 결과 출력
         st.subheader("📌 유효기한 요약")
-        for label, shelf in shelf_life_results.items():
-            st.write(f"✅ **{label}** → **{shelf:.1f}개월**")
+        for label, (shelf, note) in shelf_life_results.items():
+            if shelf == np.inf:
+                st.write(f"✅ **{label}** → ∞개월 {note}")
+            else:
+                st.write(f"✅ **{label}** → **{shelf:.1f}개월** {note}")
 
     except Exception as e:
         st.error(f"❌ 데이터 입력 오류: {e}")
