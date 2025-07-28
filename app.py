@@ -1,105 +1,82 @@
-import streamlit as st
+import os
+import urllib.request
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
-from scipy.stats import linregress
-import matplotlib
+import matplotlib.font_manager as fm
+from scipy import stats
+import streamlit as st
 
-# ✅ 한글 폰트 설정 (NanumGothic) 사용 - 시스템에 설치되어 있어야 함
-matplotlib.rcParams['font.family'] = 'NanumGothic'
-matplotlib.rcParams['axes.unicode_minus'] = False
+# ✅ Nanum Gothic 폰트 다운로드 및 설정
+FONT_PATH = "/tmp/NanumGothic.ttf"
+FONT_URL = "https://github.com/naver/nanumfont/blob/master/TTF/NanumGothic.ttf?raw=true"
 
-# ✅ Streamlit 앱 시작
-def main():
-    st.title("📊 유효기한 예측 앱")
-    st.markdown("안정성시험 데이터를 입력하면 각 로트의 유효기한을 추정합니다.")
+if not os.path.exists(FONT_PATH):
+    urllib.request.urlretrieve(FONT_URL, FONT_PATH)
 
-    st.subheader("🔢 데이터 입력")
+plt.rcParams['font.family'] = fm.FontProperties(fname=FONT_PATH).get_name()
+plt.rcParams['axes.unicode_minus'] = False
 
-    # ✅ 사용자 입력값
-    month_str = st.text_input("📆 측정 개월 (쉼표로 구분)", "0, 3, 6, 9, 12")
-    lot1_str = st.text_input("🧪 로트1 실험값", "98, 97, 96, 95, 95")
-    lot2_str = st.text_input("🧪 로트2 실험값", "99, 98, 97, 96, 95")
-    lot3_str = st.text_input("🧪 로트3 실험값", "97, 96, 95, 94, 94")
+# ✅ Streamlit UI
+st.set_page_config(page_title="유효기한 예측 도구", layout="centered")
+st.title("📈 의약품 유효기한 예측 도구")
 
-    LCL = st.number_input("🔻 하한선 (%)", value=95)
-    UCL = st.number_input("🔺 상한선 (%)", value=105)
-    conf_level = st.selectbox("📈 신뢰수준", options=["95%", "90%"], index=0)
+st.markdown("안정성시험 데이터를 입력하세요. **3개 로트**의 값을 넣고 평균을 기준으로 예측합니다.")
 
-    if conf_level == "95%":
-        z_factor = 2.0
-    else:
-        z_factor = 1.64
+# ✅ 사용자 입력
+months = st.text_input("시험 개월 (쉼표로 구분)", "0,3,6,9,12,18,24,36")
+lot1 = st.text_input("로트1 실측값", "100.0,98.1,96.2,95.8,94.7,92.3,90.1,88.4")
+lot2 = st.text_input("로트2 실측값", "100.0,98.3,96.6,95.5,94.2,92.0,90.5,88.0")
+lot3 = st.text_input("로트3 실측값", "100.0,98.0,96.3,95.6,94.5,92.1,90.4,88.2")
+limit = st.number_input("허용 하한 (%)", min_value=0.0, max_value=100.0, value=90.0)
+conf = st.selectbox("신뢰수준", ["90%", "95%"])
 
+# ✅ 버튼 클릭 시 실행
+if st.button("🔍 유효기한 예측"):
     try:
-        # ✅ 문자열 → 배열 변환
-        months = np.array([int(x.strip()) for x in month_str.split(",")])
-        lot1 = np.array([float(x.strip()) for x in lot1_str.split(",")])
-        lot2 = np.array([float(x.strip()) for x in lot2_str.split(",")])
-        lot3 = np.array([float(x.strip()) for x in lot3_str.split(",")])
-        lots = {
-            '로트1': lot1,
-            '로트2': lot2,
-            '로트3': lot3,
-            '평균': np.mean([lot1, lot2, lot3], axis=0)
-        }
+        # 입력값 처리
+        x = np.array([float(i) for i in months.split(",")])
+        y1 = np.array([float(i) for i in lot1.split(",")])
+        y2 = np.array([float(i) for i in lot2.split(",")])
+        y3 = np.array([float(i) for i in lot3.split(",")])
+        y_avg = (y1 + y2 + y3) / 3
 
-        # ✅ 유효기한 계산 함수
-        def estimate_shelf_life(x, y, label):
-            result = linregress(x, y)
-            slope = result.slope
-            intercept = result.intercept
-            stderr = result.stderr
+        # 회귀 분석
+        slope, intercept, r_value, p_value, std_err = stats.linregress(x, y_avg)
 
-            if slope < 0:
-                adjusted_slope = slope + z_factor * stderr
-                shelf_life = (LCL - intercept) / adjusted_slope
-                shelf_life = max(shelf_life, 0)
-                note = ""
+        alpha = 0.10 if conf == "90%" else 0.05
+        t_val = stats.t.ppf(1 - alpha / 2, df=len(x) - 2)
+        y_pred = intercept + slope * x
+        se = np.sqrt(np.sum((y_avg - y_pred) ** 2) / (len(x) - 2))
+        mean_x = np.mean(x)
+        conf_interval = t_val * se * np.sqrt(1 / len(x) + (x - mean_x) ** 2 / np.sum((x - mean_x) ** 2))
+        lower = y_pred - conf_interval
+        upper = y_pred + conf_interval
+
+        # 유효기한 계산
+        if slope >= 0:
+            result_text = "∞개월 (통계적 의미 없음)"
+        else:
+            t = (limit - intercept - t_val * se * np.sqrt(1 / len(x) + (0 - mean_x) ** 2 / np.sum((x - mean_x) ** 2))) / slope
+            if t < 0:
+                result_text = "0개월 (기준 초과)"
             else:
-                shelf_life = np.inf
-                note = "(통계적 의미 없음)"
+                result_text = f"{t:.1f}개월"
 
-            return result, shelf_life, note
+        st.success(f"✅ **예측 유효기한: {result_text}**")
 
-        # ✅ 그래프
-        fig, ax = plt.subplots(figsize=(10, 6))
-        colors = ['#F08080', "#6488ED", 'green', 'black']
-        shelf_life_results = {}
-
-        for i, (label, data) in enumerate(lots.items()):
-            result, shelf, note = estimate_shelf_life(months, data, label)
-            predicted = result.slope * months + result.intercept
-
-            ax.plot(months, data, 'o', color=colors[i], label=f"{label} 측정값")
-            ax.plot(months, predicted, '-', color=colors[i],
-                    label=f"{label} 추세선\n(유효기한: {'∞' if shelf == np.inf else f'{shelf:.1f}'}개월 {note})")
-
-            shelf_life_results[label] = (shelf, note)
-
-        ax.axhline(LCL, color='red', linestyle='--', linewidth=2, label='하한선')
-        ax.axhline(UCL, color='red', linestyle='--', linewidth=2, label='상한선')
-        ax.set_xlim(0, 36)
-        ax.set_ylim(80, 120)
-        ax.set_xticks(np.arange(0, 37, 3))
-        ax.set_xlabel('보관 기간 (개월)')
-        ax.set_ylabel('함량 (%)')
-        ax.set_title('안정성시험 결과 및 유효기한 추정')
+        # 그래프
+        fig, ax = plt.subplots()
+        ax.plot(x, y_avg, 'o-', label='평균 실측값')
+        ax.plot(x, y_pred, 'r--', label='회귀선')
+        ax.fill_between(x, lower, upper, color='pink', alpha=0.3, label=f'{conf} 신뢰구간')
+        ax.axhline(limit, color='gray', linestyle=':', label='허용 하한')
+        ax.set_title("유효기한 예측 회귀분석")
+        ax.set_xlabel("개월")
+        ax.set_ylabel("성분함량 (%)")
+        ax.legend()
         ax.grid(True)
-        ax.legend(loc='upper left', bbox_to_anchor=(0.58, 1), ncol=2)
-
         st.pyplot(fig)
 
-        # ✅ 유효기한 결과 출력
-        st.subheader("📌 유효기한 요약")
-        for label, (shelf, note) in shelf_life_results.items():
-            if shelf == np.inf:
-                st.write(f"✅ **{label}** → ∞개월 {note}")
-            else:
-                st.write(f"✅ **{label}** → **{shelf:.1f}개월** {note}")
-
     except Exception as e:
-        st.error(f"❌ 데이터 입력 오류: {e}")
-
-# ✅ 실행
-if __name__ == "__main__":
-    main()
+        st.error(f"❌ 오류 발생: {e}")
