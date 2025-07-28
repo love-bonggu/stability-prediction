@@ -1,5 +1,4 @@
 import os
-import urllib.request
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -7,15 +6,14 @@ import matplotlib.font_manager as fm
 from scipy import stats
 import streamlit as st
 
+# ✅ 폰트 경로 설정 (assets 폴더 안의 ttf 파일 사용)
 FONT_PATH = "assets/NanumGothic.ttf"
-
 plt.rcParams['font.family'] = fm.FontProperties(fname=FONT_PATH).get_name()
 plt.rcParams['axes.unicode_minus'] = False
 
 # ✅ Streamlit UI
 st.set_page_config(page_title="유효기한 예측 도구", layout="centered")
 st.title("📈 의약품 유효기한 예측 도구")
-
 st.markdown("안정성시험 데이터를 입력하세요. **3개 로트**의 값을 넣고 평균을 기준으로 예측합니다.")
 
 # ✅ 사용자 입력
