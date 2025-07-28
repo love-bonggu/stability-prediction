@@ -1,6 +1,6 @@
-streamlit
-numpy
-pandas
-scipy
-matplotlib
-fontconfig
+streamlit==1.24.1
+numpy==1.26.4
+pandas==2.1.0
+matplotlib==3.8.0
+scipy==1.11.1
+fontconfig==2.14.1
