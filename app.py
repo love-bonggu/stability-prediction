@@ -1,4 +1,5 @@
 import os
+import urllib.request
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -6,15 +7,21 @@ import matplotlib.font_manager as fm
 from scipy import stats
 import streamlit as st
 
-# ✅ 폰트 경로 설정 (assets 폴더 안의 ttf 파일 사용)
-FONT_PATH = "assets/NanumGothic.ttf"
-st.write("폰트 경로 존재 여부:", os.path.exists(FONT_PATH))  # True 나와야 OK
+# ✅ 안전한 외부 URL에서 /tmp 폴더로 다운로드
+FONT_URL = "https://github.com/naver/nanumfont/blob/master/TTF/NanumGothic.ttf?raw=true"
+FONT_PATH = "/tmp/NanumGothic.ttf"
+
+if not os.path.exists(FONT_PATH):
+    urllib.request.urlretrieve(FONT_URL, FONT_PATH)
+
+# ✅ 폰트 설정
 plt.rcParams['font.family'] = fm.FontProperties(fname=FONT_PATH).get_name()
 plt.rcParams['axes.unicode_minus'] = False
 
 # ✅ Streamlit UI
 st.set_page_config(page_title="유효기한 예측 도구", layout="centered")
 st.title("📈 의약품 유효기한 예측 도구")
+
 st.markdown("안정성시험 데이터를 입력하세요. **3개 로트**의 값을 넣고 평균을 기준으로 예측합니다.")
 
 # ✅ 사용자 입력
