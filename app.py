@@ -8,6 +8,7 @@ import streamlit as st
 
 # ✅ 폰트 경로 설정 (assets 폴더 안의 ttf 파일 사용)
 FONT_PATH = "assets/NanumGothic.ttf"
+st.write("폰트 경로 존재 여부:", os.path.exists(FONT_PATH))  # True 나와야 OK
 plt.rcParams['font.family'] = fm.FontProperties(fname=FONT_PATH).get_name()
 plt.rcParams['axes.unicode_minus'] = False
 
