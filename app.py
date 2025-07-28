@@ -9,7 +9,7 @@ import streamlit as st
 
 # ✅ Nanum Gothic 폰트 다운로드 및 설정
 FONT_PATH = "/tmp/NanumGothic.ttf"
-FONT_URL = "https://github.com/naver/nanumfont/blob/master/TTF/NanumGothic.ttf?raw=true"
+FONT_URL = "https://raw.githubusercontent.com/naver/nanumfont/master/TTF/NanumGothic.ttf"  # 안정적인 RAW 링크
 
 if not os.path.exists(FONT_PATH):
     urllib.request.urlretrieve(FONT_URL, FONT_PATH)
